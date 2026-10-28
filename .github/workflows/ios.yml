@@ -1,0 +1,59 @@
+
+name: Build Mindustry iOS IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Mindustry
+        uses: actions/checkout@v4
+        with:
+          path: Mindustry
+
+      - name: Checkout matching Arc
+        uses: actions/checkout@v4
+        with:
+          repository: Anuken/Arc
+          ref: 7445105cd2
+          path: Arc
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Build IPA
+        working-directory: Mindustry
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon ios:createIPA
+
+      - name: Find build outputs
+        if: always()
+        run: |
+          find Mindustry/ios/build/robovm -maxdepth 5 -type f \
+            \( -name '*.ipa' -o -name '*.app' -o -name '*.dSYM' \) \
+            -print 2>/dev/null || true
+
+      - name: Upload build outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mindustry-ios-build
+          path: Mindustry/ios/build/robovm/
+          if-no-files-found: warn
